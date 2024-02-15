@@ -1,0 +1,213 @@
+%{
+#include <stdio.h>
+#include <stdbool.h>
+int row = 1;
+bool in_multiline_comment = false;
+int comcount = 0;
+
+%}
+
+%%
+
+"/*" {
+    in_multiline_comment = true;
+    comcount++;
+}
+
+"*/" {
+    if (in_multiline_comment) {
+        comcount--;
+        if (comcount == 0) {
+            in_multiline_comment = false;
+        }
+    }
+}
+
+"Mail" { 
+    if (!in_multiline_comment) {
+        printf("%d_tMAIL\n", row);
+    }
+}
+"from" { 
+    if (!in_multiline_comment) {
+        printf("%d_tFROM\n", row);
+    }
+}
+":" { 
+    if (!in_multiline_comment) {
+        printf("%d_tCOLON\n", row);
+    }
+}
+"set" { 
+    if (!in_multiline_comment) {
+        printf("%d_tSET\n", row);
+    }
+}
+
+"//".* { 
+    
+}
+
+"schedule" { 
+    if (!in_multiline_comment) {
+        printf("%d_tSCHEDULE\n", row);
+    }
+}
+"@" { 
+    if (!in_multiline_comment) {
+        printf("%d_tAT\n", row);
+    }
+}
+"[" { 
+    if (!in_multiline_comment) {
+        printf("%d_tLBR\n", row);
+    }
+}
+
+[0-9][0-9](\/|-|\.)[0-9][0-9](\/|-|\.)[0-9][0-9][0-9][0-9] {
+    if (!in_multiline_comment) {
+        int day, month, year;
+        if (sscanf(yytext, "%d%*[-/\.]%d%*[-/\.]%d", &day, &month, &year) == 3) {
+            printf("%d_tDATE_(Day_%02d_Month_%02d_Year_%d)\n", row, day, month, year);
+        }
+    }
+}
+
+"," { 
+    if (!in_multiline_comment) {
+        printf("%d_tCOMMA\n", row);
+    }
+}
+
+[0-9][0-9](\:)[0-9][0-9]  {
+    if (!in_multiline_comment) {
+        int hour, minute;
+        if (sscanf(yytext, "%d:%d", &hour, &minute) == 2) {
+            printf("%d_tTIME_(Hour_%02d_Minute_%02d)\n", row, hour, minute);
+        }
+    }
+}
+
+"]" { 
+    if (!in_multiline_comment) {
+        printf("%d_tRBR\n", row);
+    }
+}
+"send" { 
+    if (!in_multiline_comment) {
+        printf("%d_tSEND\n", row);
+    }
+}
+"to" { 
+    if (!in_multiline_comment) {
+        printf("%d_tTO\n", row);
+    }
+}
+"(" { 
+    if (!in_multiline_comment) {
+        printf("%d_tLPR\n", row);
+    }
+}
+")" { 
+    if (!in_multiline_comment) {
+        printf("%d_tRPR\n", row);
+    }
+}
+"end schedule" { 
+    if (!in_multiline_comment) {
+        printf("%d_tENDSCHEDULE\n", row);
+    }
+}
+"end Mail" { 
+    if (!in_multiline_comment) {
+        printf("%d_tENDMAIL\n", row);
+    }
+}
+
+[A-Za-z0-9_%+-]+([.][A-Za-z0-9_%+-]+)*@[A-Za-z0-9]+([A-Za-z0-9_-]+)*[.][A-Za-z0-9]* {
+    if (!in_multiline_comment) {
+
+        char *address = yytext;
+        char prevChar = ' ';
+        bool validAddress = true;
+
+        while (*address) {
+            if (*address == '.' && prevChar == '.') {
+                validAddress = false;
+                break;
+            }
+
+            prevChar = *address;
+            address++;
+        }
+
+        if (validAddress) {
+            printf("%d_tADDRESS_(%s)\n", row, yytext);
+        }
+    }
+}
+
+[A-Za-z0-9_%+-]+([.][A-Za-z0-9_%+-]+)*@[A-Za-z0-9]+([A-Za-z0-9_%+-]*+[.][A-Za-z0-9_%+-]*+)[.][A-Za-z0-9]* {
+    if (!in_multiline_comment) {
+        char *address = yytext;
+        char prevChar = ' ';
+        bool validAddress = true;
+
+        while (*address) {
+            if (*address == '.' && prevChar == '.') {
+                validAddress = false;
+                break;
+            }
+
+            prevChar = *address;
+            address++;
+        }
+
+        if (validAddress) {
+            printf("%d_tADDRESS_(%s)\n", row, yytext);
+        }
+    }
+}
+
+
+
+
+
+[a-zA-Z_][a-zA-Z0-9_]* { 
+    if (!in_multiline_comment) {
+        printf("%d_tIDENT_(%s)\n", row, yytext);
+    }
+}
+
+\"[^\"]*\" { 
+    if (!in_multiline_comment) {
+        yytext[yyleng - 1] = '\0'; 
+        char *str = yytext + 1;
+        printf("%d_tSTRING_(%s)\n", row, str);
+        char *newline = str;
+        while (*newline) {
+            if (*newline == '\n') {
+                row++;
+            }
+            newline++;
+        }
+    }
+}
+
+\n {
+    row++;
+    
+}
+[ \t\n]
+. {
+    if (!in_multiline_comment) {
+        printf("%d_ILLEGAL_CHARACTER_(%s)\n", row, yytext);
+    }
+}
+
+%%
+
+int main() {
+    yylex();
+    return 0;
+}
